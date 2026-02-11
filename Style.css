@@ -54,6 +54,8 @@ body {
 }
 
 .game-container {
+    width: 800px;
+    height: 625px;
     transform: scale(0.75);
     margin-top: 20px;
     position: relative;

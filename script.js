@@ -31,6 +31,7 @@ let startScreen = document.getElementById("start-screen");
 startButton.addEventListener("click", function () {
     startScreen.classList.add("hidden");
     gameRunning = true;
+    newGame();
 });
 
 let game = new Phaser.Game(config);
@@ -436,8 +437,20 @@ class Ghost {
 
     respawn() {
         this.sprite.setPosition(this.spawnPoint.x, this.spawnPoint.y);
-        this.move(this.rnd.pick([Phaser.UP, Phaser.DOWN]));
+        // this.move(this.rnd.pick([Phaser.UP, Phaser.DOWN])); // Old logic
+        this.current = Phaser.NONE; // Reset current direction
+        this.moveTo = new Phaser.Geom.Point(); // Reset velocity
         this.sprite.flipX = false;
+        // The update loop will call chase() because current is NONE or unsafe, picking a visual direction
+        // But better to force a valid move start?
+        // Let's just set it to NONE and let update/chase handle it, OR pick a random SAFE neighbor.
+        // Actually, if we set current to NONE, update() checking this.directions[this.current] might fail if current is NONE?
+        // this.directions[Phaser.NONE] is undefined.
+        // So we should pick a valid direction.
+
+        this.move(Phaser.LEFT); // Default start direction? Or let chase figure it out?
+        // Better:
+        this.move(this.rnd.pick([Phaser.LEFT, Phaser.RIGHT])); // Try horizontal first?
     }
 
     moveLeft() {
@@ -478,7 +491,7 @@ class Ghost {
             this.directions[this.current] &&
             !this.isSafe(this.directions[this.current].index)
         ) {
-            this.sprite.anims.play("faceRight", true); // Keeping original animation call though it looks weird
+            // this.sprite.anims.play("faceRight", true); // Removing invalid animation
             this.chase();
         }
     }
