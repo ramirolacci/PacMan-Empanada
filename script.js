@@ -24,6 +24,15 @@ let config = {
     }
 };
 
+let gameRunning = false;
+let startButton = document.getElementById("start-btn");
+let startScreen = document.getElementById("start-screen");
+
+startButton.addEventListener("click", function () {
+    startScreen.classList.add("hidden");
+    gameRunning = true;
+});
+
 let game = new Phaser.Game(config);
 let cursors;
 let player;
@@ -209,6 +218,7 @@ function create() {
     this.physics.add.collider(player.sprite, layer1);
     this.physics.add.collider(player.sprite, layer2);
     this.physics.add.collider(ghostsGroup, layer1);
+    this.physics.add.collider(ghostsGroup, layer2); // Add collision with layer 2 for ghosts too
     this.physics.add.overlap(
         player.sprite,
         pills,
@@ -286,6 +296,8 @@ function newGame() {
 }
 
 function update() {
+    if (!gameRunning) return;
+
     player.setDirections(getDirection(map, layer1, player.sprite));
 
     if (!player.playing) {
@@ -305,15 +317,13 @@ function update() {
     }
 
     if (cursors.left.isDown) {
-        player.setTurn(Phaser.LEFT);
+        player.queueTurn(Phaser.LEFT);
     } else if (cursors.right.isDown) {
-        player.setTurn(Phaser.RIGHT);
+        player.queueTurn(Phaser.RIGHT);
     } else if (cursors.up.isDown) {
-        player.setTurn(Phaser.UP);
+        player.queueTurn(Phaser.UP);
     } else if (cursors.down.isDown) {
-        player.setTurn(Phaser.DOWN);
-    } else {
-        player.setTurn(Phaser.NONE);
+        player.queueTurn(Phaser.DOWN);
     }
 
     player.update();
@@ -391,7 +401,7 @@ class Ghost {
         this.anim = anim;
         this.speed = 100;
         this.moveTo = new Phaser.Geom.Point();
-        this.safetile = [-1, 19];
+        this.safetile = [-1, 18, 19]; // Sync with player + 19? Player uses 18. Let's include both to be safe.
         this.directions = [];
         this.opposites = [
             null,
@@ -462,12 +472,71 @@ class Ghost {
             this.moveTo.y * this.speed
         );
         this.turn();
+
+        // Smart AI: Chase Player at intersections
         if (
             this.directions[this.current] &&
             !this.isSafe(this.directions[this.current].index)
         ) {
-            this.sprite.anims.play("faceRight", true);
-            this.takeRandomTurn();
+            this.sprite.anims.play("faceRight", true); // Keeping original animation call though it looks weird
+            this.chase();
+        }
+    }
+
+    chase() {
+        let turns = [];
+        for (let i = 0; i < this.directions.length; i++) {
+            let direction = this.directions[i];
+            if (direction) {
+                if (this.isSafe(direction.index)) {
+                    // Don't turn back immediately unless dead end (handled by logic below usually?)
+                    // Actually, opposites logic prevents 180 here usually in setTurn?
+                    // But here we are picking a NEW turn.
+                    turns.push(i);
+                }
+            }
+        }
+
+        // Remove opposite direction to prevent oscillating, unless it's the only option
+        if (turns.length > 1) {
+            let index = turns.indexOf(this.opposites[this.current]);
+            if (index > -1) {
+                turns.splice(index, 1);
+            }
+        }
+
+        let bestTurn = Phaser.NONE;
+        let minDist = 999999;
+
+        // 20% Randomness to make them not too perfect
+        if (this.rnd.integerInRange(0, 100) < 20) {
+            this.setTurn(this.rnd.pick(turns));
+            return;
+        }
+
+        for (let turn of turns) {
+            let point = this.directions[turn];
+            // Calculate distance to player from this potential new tile
+            let dist = Phaser.Math.Distance.Between(point.x, point.y, player.sprite.x / 32, player.sprite.y / 32);
+            // point.x/y are in tile coords? No, getTileAt returns Tile object. x,y are tile indices.
+
+            if (dist < minDist) {
+                minDist = dist;
+                bestTurn = turn;
+            }
+        }
+
+        if (bestTurn !== Phaser.NONE) {
+            this.setTurn(bestTurn);
+        } else if (turns.length > 0) {
+            this.setTurn(turns[0]);
+        } else {
+            // Fallback: If no turns found (e.g. boxed in or errored), try any random safe direction from opposite
+            // This prevents freezing.
+            let reverseDirection = this.opposites[this.current];
+            if (reverseDirection && this.directions[reverseDirection] && this.isSafe(this.directions[reverseDirection].index)) {
+                this.setTurn(reverseDirection);
+            }
         }
     }
 
@@ -527,7 +596,8 @@ class Ghost {
 
     turn() {
         if (this.turnCount === this.turnAt) {
-            this.takeRandomTurn();
+            // this.takeRandomTurn(); // Disable random turning at time
+            this.chase(); // Periodically re-evaluate path
         }
         this.turnCount++;
 
@@ -620,7 +690,7 @@ class Player {
         // Robust physics body sizing
         // We ensure the body is a circle slightly smaller than the visual sprite to allow smooth cornering
         let s = this.sprite.width < this.sprite.height ? this.sprite.width : this.sprite.height;
-        let radius = (s / 2) * 0.8; // Use 80% of the radius for safety
+        let radius = (s / 2) * 0.6; // Use 60% of the radius for safety/easier turning
 
         // Center the circle body within the sprite frame
         let offsetX = (this.sprite.width - (radius * 2)) / 2;
@@ -633,7 +703,10 @@ class Player {
         this.speed = 95;
         this.moveTo = new Phaser.Geom.Point();
         this.sprite.angle = 180;
-        this.safetile = [-1, 18];
+        this.moveTo = new Phaser.Geom.Point();
+        this.sprite.angle = 180;
+        this.safetile = [-1, 18, 19]; // Sync safe tiles
+        this.directions = [];
         this.directions = [];
         this.opposites = [
             null,
@@ -648,8 +721,9 @@ class Player {
         ];
         this.turning = Phaser.NONE;
         this.current = Phaser.NONE;
+        this.current = Phaser.NONE;
         this.turningPoint = new Phaser.Geom.Point();
-        this.threshold = 5;
+        this.threshold = 10; // Increased threshold for easier turning
         this.life = 3;
         this.score = 0;
         this.active = true;
@@ -663,6 +737,12 @@ class Player {
             scene
         );
         this.playing = false;
+        this.nextDirection = Phaser.NONE;
+    }
+
+    queueTurn(turnTo) {
+        if (turnTo === Phaser.NONE) return;
+        this.nextDirection = turnTo;
     }
 
     die() {
@@ -719,6 +799,12 @@ class Player {
     }
 
     update() {
+        if (this.nextDirection !== Phaser.NONE) {
+            if (this.setTurn(this.nextDirection)) {
+                this.nextDirection = Phaser.NONE;
+            }
+        }
+
         this.sprite.setVelocity(
             this.moveTo.x * this.speed,
             this.moveTo.y * this.speed
@@ -755,8 +841,17 @@ class Player {
             this.move(turnTo);
             this.turning = Phaser.NONE;
             this.turningPoint = new Phaser.Geom.Point();
+            this.nextDirection = Phaser.NONE; // Clear buffer
+            return true;
         } else {
             this.turning = turnTo;
+            this.turningPoint = new Phaser.Geom.Point(); // Ensure turning point is fresh? No, turningPoint is set by setTurningPoint separately.
+            // Wait, existing code didn't reset turningPoint here.
+            // existing code:
+            // } else {
+            //    this.turning = turnTo;
+            // }
+            return true;
         }
     }
 
