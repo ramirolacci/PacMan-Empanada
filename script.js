@@ -48,6 +48,23 @@ let graphics;
 let scoreText;
 let livesImage = [];
 let tiles = "pacman-tiles";
+let winScreen = document.getElementById("win-screen");
+let restartButton = document.getElementById("restart-btn");
+let gameOverScreen = document.getElementById("gameover-screen");
+let retryButton = document.getElementById("retry-btn");
+
+restartButton.addEventListener("click", function () {
+    winScreen.classList.add("hidden");
+    gameRunning = true;
+    newGame();
+});
+
+retryButton.addEventListener("click", function () {
+    gameOverScreen.classList.add("hidden");
+    startScreen.classList.remove("hidden");
+    newGame();
+    gameRunning = false; // Stop game loop until "COMENZAR" is clicked
+});
 let spritesheet = "pacman-spritesheet";
 let spritesheetPath = "https://raw.githubusercontent.com/kudchikarsk/phaser-pacman/master/assets/images/pacmansprites.png";
 let tilesPath = "https://raw.githubusercontent.com/kudchikarsk/phaser-pacman/master/assets/images/background.png";
@@ -167,8 +184,27 @@ function create() {
     layer1 = map.createStaticLayer("Layer 1", tileset, 0, 0);
     layer1.setCollisionByProperty({ collides: true });
 
+    // Remove the "Red Bar" / Ghost House Door to prevent getting stuck
+    // We replace the door tiles with safe empty tiles (index 19)
+    try {
+        // Approximate location of the door based on ghost spawn y=11
+        // Door is likely at y=10, center x=12,13
+        map.putTileAt(19, 12, 10, true, layer1);
+        map.putTileAt(19, 13, 10, true, layer1);
+    } catch (e) {
+        console.warn("Could not remove ghost house door", e);
+    }
+
     layer2 = map.createStaticLayer("Layer 2", tileset, 0, 0);
     layer2.setCollisionByProperty({ collides: true });
+
+    // Remove visual door from Layer 2 if it exists there
+    try {
+        map.removeTileAt(12, 10, true, true, layer2);
+        map.removeTileAt(13, 10, true, true, layer2);
+    } catch (e) {
+        console.warn("Could not remove visual ghost house door", e);
+    }
 
     let spawnPoint = map.findObject("Objects", obj => obj.name === "Player");
     let position = new Phaser.Geom.Point(
@@ -177,7 +213,9 @@ function create() {
     );
     player = new Player(this, position, Animation.Player, function () {
         if (player.life <= 0) {
-            newGame();
+            // Game Over - Lose
+            gameRunning = false;
+            gameOverScreen.classList.remove("hidden");
         } else {
             respawn();
         }
@@ -206,9 +244,31 @@ function create() {
         Animation.Ghost.Orange,
         Animation.Ghost.Pink
     ];
+
+    // Find all safe tiles for random spawning
+    let safeTiles = [];
+    layer1.forEachTile(function (tile) {
+        if (tile.index === 19 || tile.index === 18 || tile.index === -1) { // -1 is open space
+            // Exclude Ghost House area (approx center) to prevent getting stuck
+            // Door is at 12,10. Box is roughly 10-15, 8-12.
+            if (tile.x >= 10 && tile.x <= 15 && tile.y >= 8 && tile.y <= 12) {
+                return;
+            }
+            safeTiles.push({ x: tile.pixelX + offset, y: tile.pixelY + offset });
+        }
+    });
+
     map.filterObjects("Objects", function (value, index, array) {
         if (value.name == "Ghost") {
-            let position = new Phaser.Geom.Point(value.x + offset, value.y - offset);
+            let position;
+            if (safeTiles.length > 0) {
+                // Pick random safe tile
+                let randTile = Phaser.Math.RND.pick(safeTiles);
+                position = new Phaser.Geom.Point(randTile.x, randTile.y);
+            } else {
+                position = new Phaser.Geom.Point(value.x + offset, value.y - offset);
+            }
+
             let ghost = new Ghost(scene, position, skins[i]);
             ghosts.push(ghost);
             ghostsGroup.add(ghost.sprite);
@@ -228,7 +288,9 @@ function create() {
             pillsAte++;
             player.score += 10;
             if (pillsCount == pillsAte) {
-                reset();
+                // Game Over - Win
+                gameRunning = false;
+                winScreen.classList.remove("hidden");
             }
         },
         null,
@@ -286,7 +348,7 @@ function reset() {
 
 function newGame() {
     reset();
-    player.life = 3;
+    player.life = 1; // Set to 1 Life as requested
     player.score = 0;
     for (let i = 0; i < player.life; i++) {
         let image = livesImage[i];
@@ -301,11 +363,10 @@ function update() {
 
     player.setDirections(getDirection(map, layer1, player.sprite));
 
-    if (!player.playing) {
-        for (let ghost of ghosts) {
-            ghost.freeze();
-        }
-    }
+    player.setDirections(getDirection(map, layer1, player.sprite));
+
+    // Remove ghost freeze logic dependent on player.playing
+    // Ghosts should always move if gameRunning is true.
 
     for (let ghost of ghosts) {
         ghost.setDirections(getDirection(map, layer1, ghost.sprite));
@@ -331,7 +392,10 @@ function update() {
 
     for (let ghost of ghosts) {
         ghost.update();
+        this.physics.world.wrap(ghost.sprite);
     }
+
+    this.physics.world.wrap(player.sprite);
 
     scoreText.setText("Score: " + player.score);
 
@@ -400,9 +464,9 @@ class Ghost {
             .setOrigin(0.5);
         this.spawnPoint = position;
         this.anim = anim;
-        this.speed = 100;
+        this.speed = 130;
         this.moveTo = new Phaser.Geom.Point();
-        this.safetile = [-1, 18, 19]; // Sync with player + 19? Player uses 18. Let's include both to be safe.
+        this.safetile = [-1, 18, 19];
         this.directions = [];
         this.opposites = [
             null,
@@ -415,15 +479,17 @@ class Ghost {
             Phaser.RIGHT,
             Phaser.LEFT
         ];
-        this.turning = Phaser.NONE;
         this.current = Phaser.NONE;
+        this.turning = Phaser.NONE;
         this.turningPoint = new Phaser.Geom.Point();
-        this.threshold = 5;
+        this.threshold = 32;
         this.rnd = new Phaser.Math.RandomDataGenerator();
         this.sprite.anims.play(anim.Move, true);
         this.turnCount = 0;
         this.turnAtTime = [4, 8, 16, 32, 64];
         this.turnAt = this.rnd.pick(this.turnAtTime);
+        this.lastPosition = new Phaser.Geom.Point(0, 0);
+        this.stuckTimer = 0;
     }
 
     freeze() {
@@ -436,6 +502,12 @@ class Ghost {
     }
 
     respawn() {
+        // Random respawn on death too? Or keep original spawn point?
+        // User asked for random places, usually means Start. But respawning at same spot is boring.
+        // Let's respawn at original spawnPoint (which was random chosen at start).
+        // Or re-roll? Re-rolling might spawn on top of player.
+        // Let's stick to using the constructor-assigned spawnPoint for now, but that spawnPoint IS random.
+
         this.sprite.setPosition(this.spawnPoint.x, this.spawnPoint.y);
         // this.move(this.rnd.pick([Phaser.UP, Phaser.DOWN])); // Old logic
         this.current = Phaser.NONE; // Reset current direction
@@ -480,16 +552,51 @@ class Ghost {
     }
 
     update() {
+        // Detect if stuck
+        if (Math.abs(this.sprite.x - this.lastPosition.x) < 0.1 && Math.abs(this.sprite.y - this.lastPosition.y) < 0.1) {
+            this.stuckTimer++;
+            if (this.stuckTimer > 60) { // 1 second stuck
+                // Force random turn
+                let possible = [Phaser.LEFT, Phaser.RIGHT, Phaser.UP, Phaser.DOWN];
+                let newDir = Phaser.Math.RND.pick(possible);
+                this.move(newDir);
+                this.stuckTimer = 0;
+            }
+        } else {
+            this.stuckTimer = 0;
+        }
+        this.lastPosition.x = this.sprite.x;
+        this.lastPosition.y = this.sprite.y;
+
         this.sprite.setVelocity(
             this.moveTo.x * this.speed,
             this.moveTo.y * this.speed
         );
+
         this.turn();
 
-        // Smart AI: Chase Player at intersections
+        // Blocked check
         if (
             this.directions[this.current] &&
             !this.isSafe(this.directions[this.current].index)
+        ) {
+            // If we hit a wall/unsafe tile
+            if (this.turning !== Phaser.NONE) {
+                // We were trying to turn? Force it.
+                this.sprite.setPosition(this.turningPoint.x, this.turningPoint.y);
+                this.move(this.turning);
+                this.turning = Phaser.NONE;
+            } else {
+                // Try to reverse OR chase
+                // this.chase(); // Chase logic will pick new path
+                // But chase only runs below.
+            }
+        }
+
+        // Smart AI: Chase Player at intersections or if blocked
+        if (
+            this.current === Phaser.NONE ||
+            (this.directions[this.current] && !this.isSafe(this.directions[this.current].index))
         ) {
             // this.sprite.anims.play("faceRight", true); // Removing invalid animation
             this.chase();
