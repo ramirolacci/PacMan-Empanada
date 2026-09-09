@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="./Logo%20Mi%20Gusto%202025.png" alt="Logo Mi Gusto" width="280">
+  <img src="./Logo Mi Gusto 2025.png" alt="Logo Mi Gusto" width="280">
 
   # 🥟 PacMan Empanada
 
