@@ -66,10 +66,9 @@ retryButton.addEventListener("click", function () {
     gameRunning = false; // Stop game loop until "COMENZAR" is clicked
 });
 let spritesheet = "pacman-spritesheet";
-let spritesheetPath = "https://raw.githubusercontent.com/kudchikarsk/phaser-pacman/master/assets/images/pacmansprites.png";
-let tilesPath = "https://raw.githubusercontent.com/kudchikarsk/phaser-pacman/master/assets/images/background.png";
-let mapPath =
-    "https://raw.githubusercontent.com/kudchikarsk/phaser-pacman/master/assets/levels/codepen-level.json";
+let spritesheetPath = "pacmansprites.png";
+let tilesPath = "background.png";
+let mapPath = "codepen-level.json";
 let Animation = {
     Player: {
         Eat: "player-eat",
@@ -106,8 +105,8 @@ function preload() {
     });
     this.load.tilemapTiledJSON("map", mapPath);
     this.load.image(tiles, tilesPath);
-    this.load.image("pill", "https://raw.githubusercontent.com/kudchikarsk/phaser-pacman/master/assets/images/pac%20man%20pill/spr_pill_0.png");
-    this.load.image("lifecounter", "https://raw.githubusercontent.com/kudchikarsk/phaser-pacman/master/assets/images/pac%20man%20life%20counter/spr_lifecounter_0.png");
+    this.load.image("pill", "pill.png");
+    this.load.image("lifecounter", "lifecounter.png");
     this.load.image("pacman-empanada", "pacman-empanada.png");
     this.load.image("pacman-empanada2", "pacman-empanada2.png");
     this.load.image("ghost1", "fantasma-empanada1.png");
@@ -332,25 +331,35 @@ function create() {
 }
 
 function respawn() {
-    player.respawn();
-    for (let ghost of ghosts) {
-        ghost.respawn();
+    if (player && typeof player.respawn === "function") {
+        player.respawn();
+    }
+    if (ghosts && Array.isArray(ghosts)) {
+        for (let ghost of ghosts) {
+            if (ghost && typeof ghost.respawn === "function") {
+                ghost.respawn();
+            }
+        }
     }
 }
 
 function reset() {
     respawn();
-    for (let child of pills.getChildren()) {
-        child.enableBody(false, child.x, child.y, true, true);
+    if (pills && typeof pills.getChildren === "function") {
+        for (let child of pills.getChildren()) {
+            child.enableBody(false, child.x, child.y, true, true);
+        }
     }
     pillsAte = 0;
 }
 
 function newGame() {
     reset();
-    player.life = 1; // Set to 1 Life as requested
-    player.score = 0;
-    for (let i = 0; i < player.life; i++) {
+    if (player) {
+        player.life = 1; // Set to 1 Life as requested
+        player.score = 0;
+    }
+    for (let i = 0; i < (player ? player.life : 0); i++) {
         let image = livesImage[i];
         if (image) {
             image.alpha = 1;
@@ -359,7 +368,7 @@ function newGame() {
 }
 
 function update() {
-    if (!gameRunning) return;
+    if (!gameRunning || !player || !map || !layer1) return;
 
     player.setDirections(getDirection(map, layer1, player.sprite));
 
