@@ -1,15 +1,15 @@
 <div align="center">
 
-  <img src="Logo Mi Gusto 2025.png" alt="Logo Mi Gusto" width="280">
+  <img src="./Logo%20Mi%20Gusto%202025.png" alt="Logo Mi Gusto" width="280">
 
   # 🥟 PacMan Empanada
 
   **Una experiencia arcade clásica reinventada al estilo Mi Gusto.**
 
   [![Phaser](https://img.shields.io/badge/Engine-Phaser_3.12-brightgreen?style=for-the-badge&logo=phaser)](https://phaser.io/)
-  [![HTML5](https://img.shields.io/badge/Frontend-HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)](https://developer.mozilla.org/es/docs/Web/HTML)
-  [![CSS3](https://img.shields.io/badge/Styling-CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://developer.mozilla.org/es/docs/Web/CSS)
-  [![JavaScript](https://img.shields.io/badge/Logic-JavaScript_ES6+-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/es/docs/Web/JavaScript)
+  ![HTML5](https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white)
+  ![CSS](https://img.shields.io/badge/css-%23663399.svg?style=for-the-badge&logo=css&logoColor=white)
+  ![JavaScript](https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=%23F7DF1E)
 
   ---
 
@@ -35,22 +35,14 @@ El jugador controla a **PacMan Empanada** a través de un laberinto retro replet
 
 ## 📸 Galería de Imágenes
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="50%">
-        <img src="Screenshot_1.png" alt="PacMan Empanada - Captura 1" width="100%" style="border-radius: 8px;">
-        <br>
-        <sub><b>Vista Principal del Laberinto</b></sub>
-      </td>
-      <td align="center" width="50%">
-        <img src="Screenshot_2.png" alt="PacMan Empanada - Captura 2" width="100%" style="border-radius: 8px;">
-        <br>
-        <sub><b>Gameplay y Coleccionables</b></sub>
-      </td>
-    </tr>
-  </table>
-</div>
+<p align="center">
+  <img src="./Screenshot_1.png" alt="PacMan Empanada - Captura 1" width="48%" />
+  &nbsp;
+  <img src="./Screenshot_2.png" alt="PacMan Empanada - Captura 2" width="48%" />
+</p>
+<p align="center">
+  <sub><b>Vista Principal del Laberinto &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Gameplay y Coleccionables</b></sub>
+</p>
 
 ---
 
